@@ -18,10 +18,10 @@ from app.core.config import settings
 
 class SubscriptionPlan(str, enum.Enum):
     """Plans d'abonnement disponibles avec nouveaux prix"""
-    MONTHLY = "monthly"        # 1 mois - 2100 FCFA
-    QUARTERLY = "quarterly"    # 3 mois - 5100 FCFA
-    BIANNUAL = "semiannual"     # 6 mois - 9100 FCFA
-    ANNUAL = "annual"         # 12 mois - 16100 FCFA
+    MONTHLY = "monthly"        # 1 mois - 2500 FCFA
+    QUARTERLY = "quarterly"    # 3 mois - 5500 FCFA
+    BIANNUAL = "semiannual"     # 6 mois - 9500 FCFA
+    ANNUAL = "annual"         # 12 mois - 16500 FCFA
 
 class SubscriptionStatus(str, enum.Enum):
     """Statuts d'abonnement"""
