@@ -134,6 +134,49 @@ async def initialize_payment(
 # =========================================
 # VÉRIFICATION DE PAIEMENT
 # =========================================
+@router.get("/operators")
+async def get_payment_operators():
+    """Liste des opérateurs mobiles supportés par CinetPay"""
+    operators = [
+        {
+            "id": "orange",
+            "name": "Orange Money",
+            "channel": "MOBILE_MONEY",
+            "color": "#FF6600",
+            "icon": "🟠",
+            "enabled": True
+        },
+        {
+            "id": "mtn",
+            "name": "MTN Mobile Money",
+            "channel": "MOBILE_MONEY",
+            "color": "#FFCC00",
+            "icon": "🟡",
+            "enabled": True
+        },
+        {
+            "id": "wave",
+            "name": "Wave",
+            "channel": "WALLET",
+            "color": "#00A3FF",
+            "icon": "🟣",
+            "enabled": True
+        },
+        {
+            "id": "moov",
+            "name": "Moov Money",
+            "channel": "MOBILE_MONEY",
+            "color": "#0066CC",
+            "icon": "🔵",
+            "enabled": True
+        }
+    ]
+    
+    return {"success": True, "operators": operators}
+
+# =========================================
+# VÉRIFICATION DE PAIEMENT
+# =========================================
 
 @router.post("/verify", response_model=PaymentVerificationResponse)
 async def verify_payment(
