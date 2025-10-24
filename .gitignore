@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+venv/
+env/
+ENV/
+
+# Fichiers sensibles
+.env
+.env.*
+
+# Uploads et logs
+uploads/
+logs/
+*.log
+
+# Base de données
+*.db
+*.sqlite
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Tests
+.pytest_cache/
