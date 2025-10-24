@@ -93,8 +93,8 @@ class SubscriptionService:
                 "id": "monthly",
                 "name": "Mensuel",
                 "duration_months": 1,
-                "price": 2100,  # +100 FCFA
-                "original_price": 2100,
+                "price": 2500,
+                "original_price": 2500,
                 "description": "Parfait pour commencer",
                 "features": [
                     "Profil visible 30 jours",
@@ -109,9 +109,9 @@ class SubscriptionService:
                 "id": "quarterly",
                 "name": "Trimestriel", 
                 "duration_months": 3,
-                "price": 5100,  # +100 FCFA
-                "original_price": 6300,  # 3 x 2100
-                "description": "Économisez 19%",
+                "price": 5500,
+                "original_price": 7000, 
+                "description": "Économisez 27%",
                 "features": [
                     "Profil visible 3 mois",
                     "Portfolio illimité",
@@ -119,16 +119,16 @@ class SubscriptionService:
                     "Support prioritaire",
                     "Statistiques détaillées"
                 ],
-                "savings": 1200,
+                "savings": 1500,
                 "is_popular": False
             },
             {
                 "id": "biannual",
                 "name": "Semestriel",
                 "duration_months": 6, 
-                "price": 9100,  # +100 FCFA
-                "original_price": 12600,  # 6 x 2100
-                "description": "Économisez 28%",
+                "price": 9500,
+                "original_price": 13000,
+                "description": "Économisez 37%",
                 "features": [
                     "Profil visible 6 mois",
                     "Portfolio illimité",
@@ -144,9 +144,9 @@ class SubscriptionService:
                 "id": "annual",
                 "name": "Annuel",
                 "duration_months": 12,
-                "price": 16100,  # +100 FCFA
-                "original_price": 25200,  # 12 x 2100
-                "description": "Meilleure offre - Économisez 36%",
+                "price": 16500,
+                "original_price": 25000,
+                "description": "Meilleure offre - Économisez 45%",
                 "features": [
                     "Profil visible 1 an",
                     "Portfolio illimité",
@@ -157,7 +157,7 @@ class SubscriptionService:
                     "Formation en ligne gratuite",
                     "Mise en avant occasionnelle"
                 ],
-                "savings": 9100,
+                "savings": 8500,
                 "is_popular": False,
                 "is_best_value": True
             }
