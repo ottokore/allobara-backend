@@ -1,0 +1,58 @@
+# =========================================
+# ALLOBARA BACKEND - REQUIREMENTS.TXT
+# Dépendances Python pour le backend FastAPI
+# =========================================
+
+# FastAPI et serveur ASGI
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Base de données PostgreSQL
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.7
+alembic==1.12.1
+
+# Authentification et sécurité - VERSIONS CORRIGÉES
+python-jose[cryptography]==3.3.0
+passlib==1.7.4
+bcrypt==4.0.1
+python-dateutil==2.8.2
+
+# Cache Redis et jobs asynchrones
+redis==5.0.1
+celery==5.3.4
+
+# Services externes
+twilio==8.10.0
+requests==2.31.0
+
+# Upload et traitement de fichiers
+pillow==10.1.0
+python-magic==0.4.27
+
+# Storage cloud (optionnel)
+boto3==1.29.7
+cloudinary==1.36.0
+
+# Validation et sérialisation
+pydantic==2.5.0
+pydantic-settings==2.1.0
+email-validator==2.1.0
+
+# Utilitaires
+python-slugify==8.0.1
+python-dotenv==1.0.0
+httpx==0.25.2
+
+# Monitoring et logs (optionnel)
+sentry-sdk[fastapi]==1.38.0
+
+# Tests (pour plus tard)
+pytest==7.4.3
+pytest-asyncio==0.21.1
+
+# Développement uniquement
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
