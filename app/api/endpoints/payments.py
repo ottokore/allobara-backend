@@ -374,81 +374,80 @@ async def get_payment_history(
 # PLANS D'ABONNEMENT
 # =========================================
 
-@router.get("/plans", response_model=SubscriptionPlansResponse)
+@router.get("/plans")
 async def get_subscription_plans():
-    """
-    Liste des plans d'abonnement disponibles
-    
-    Returns:
-        Liste des plans avec détails et prix
-    """
+    """Liste des plans d'abonnement disponibles"""
     plans = [
-        SubscriptionPlanSchema(
-            id="monthly",
-            name="Mensuel",
-            duration_days=30,
-            amount=2100,
-            currency="FCFA",
-            description="Abonnement mensuel - Parfait pour commencer",
-            features=[
-                "Profil visible dans les recherches",
+        {
+            "id": "monthly",
+            "name": "Mensuel",
+            "duration_days": 30,
+            "amount": 2500,
+            "currency": "FCFA",
+            "description": "Parfait pour commencer",
+            "features": [
+                "Profil visible 30 jours",
                 "Portfolio illimité",
-                "Réception d'appels clients"
-            ]
-        ),
-        SubscriptionPlanSchema(
-            id="quarterly",
-            name="Trimestriel",
-            duration_days=90,
-            amount=5100,
-            currency="FCFA",
-            description="3 mois d'abonnement - Économisez 1200 FCFA",
-            features=[
+                "Contact direct clients",
+                "Support client"
+            ],
+            "savings": 0,
+            "discount_percentage": 0,
+            "popular": False
+        },
+        {
+            "id": "quarterly",
+            "name": "Trimestriel",
+            "duration_days": 90,
+            "amount": 5500,
+            "currency": "FCFA",
+            "description": "Économisez 27%",
+            "features": [
                 "Tous les avantages du plan mensuel",
-                "Économie de 1200 FCFA",
-                "Support prioritaire"
+                "Support prioritaire",
+                "Statistiques détaillées"
             ],
-            savings=1200
-        ),
-        SubscriptionPlanSchema(
-            id="biannual",
-            name="Semestriel",
-            duration_days=180,
-            amount=9100,
-            currency="FCFA",
-            description="6 mois d'abonnement - Économisez 3500 FCFA",
-            features=[
+            "savings": 2000,
+            "discount_percentage": 27,
+            "popular": False
+        },
+        {
+            "id": "biannual",
+            "name": "Semestriel",
+            "duration_days": 180,
+            "amount": 9500,
+            "currency": "FCFA",
+            "description": "Économisez 37%",
+            "features": [
                 "Tous les avantages précédents",
-                "Économie de 3500 FCFA",
-                "Badge 'Prestataire Premium'",
-                "Priorité dans les recherches"
+                "Badge prestataire expérimenté",
+                "Statistiques avancées"
             ],
-            savings=3500,
-            popular=True
-        ),
-        SubscriptionPlanSchema(
-            id="annual",
-            name="Annuel",
-            duration_days=365,
-            amount=16100,
-            currency="FCFA",
-            description="12 mois d'abonnement - Économisez 9100 FCFA",
-            features=[
+            "savings": 5500,
+            "discount_percentage": 37,
+            "popular": True
+        },
+        {
+            "id": "annual",
+            "name": "Annuel",
+            "duration_days": 365,
+            "amount": 16500,
+            "currency": "FCFA",
+            "description": "Meilleure offre - Économisez 45%",
+            "features": [
                 "Tous les avantages précédents",
-                "Économie de 9100 FCFA",
-                "Support VIP 24/7",
-                "Accès aux formations gratuites",
-                "Badge 'Prestataire Elite'"
+                "Badge prestataire premium",
+                "Formation en ligne gratuite",
+                "Support VIP"
             ],
-            savings=9100,
-            best_value=True
-        )
+            "savings": 13500,
+            "discount_percentage": 45,
+            "popular": False,
+            "best_value": True
+        }
     ]
     
-    return SubscriptionPlansResponse(
-        success=True,
-        plans=plans
-    )
+    return {"success": True, "plans": plans}
 
 
 # =========================================
