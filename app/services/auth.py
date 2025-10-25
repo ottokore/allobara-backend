@@ -31,59 +31,42 @@ class AuthService:
         self.sms_service = SMSService()
         self.cache = CacheService()  # ⭐ Instance du cache
     
-    def _store_otp_sync(self, phone_number: str, otp_code: str) -> None:
+    async def _store_otp(self, phone_number: str, otp_code: str) -> None:
         """
-        Stocker l'OTP dans Redis (10 minutes) - Version synchrone
+        Stocker l'OTP dans Redis (10 minutes) - Version async
         """
         expires_in = 600  # 10 minutes en secondes
         redis_key = f"otp:{phone_number}"
         
-        # Appeler la méthode async de manière synchrone
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            loop.run_until_complete(
-                self.cache.set(redis_key, otp_code, expire_seconds=expires_in)
-            )
-            logger.info(f"📱 OTP stocké dans Redis pour {phone_number}: {otp_code} (expire dans 10min)")
-        finally:
-            loop.close()
+        # Utiliser directement la méthode async
+        await self.cache.set(redis_key, otp_code, expire_seconds=expires_in)
+        logger.info(f"📱 OTP stocké dans Redis pour {phone_number}: {otp_code} (expire dans 10min)")
     
-    def _get_otp_sync(self, phone_number: str) -> Optional[str]:
+    async def _get_otp(self, phone_number: str) -> Optional[str]:
         """
-        Récupérer l'OTP depuis Redis - Version synchrone
+        Récupérer l'OTP depuis Redis - Version async
         """
         redis_key = f"otp:{phone_number}"
         
-        # Appeler la méthode async de manière synchrone
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            otp_code = loop.run_until_complete(self.cache.get(redis_key))
-            
-            if otp_code:
-                logger.info(f"✅ OTP trouvé dans Redis pour {phone_number}: {otp_code}")
-                return otp_code
-            else:
-                logger.warning(f"❌ Aucun OTP trouvé dans Redis pour {phone_number}")
-                return None
-        finally:
-            loop.close()
+        # Utiliser directement la méthode async
+        otp_code = await self.cache.get(redis_key)
+        
+        if otp_code:
+            logger.info(f"✅ OTP trouvé dans Redis pour {phone_number}: {otp_code}")
+            return otp_code
+        else:
+            logger.warning(f"❌ Aucun OTP trouvé dans Redis pour {phone_number}")
+            return None
     
-    def _clear_otp_sync(self, phone_number: str) -> None:
+    async def _clear_otp(self, phone_number: str) -> None:
         """
-        Supprimer l'OTP de Redis - Version synchrone
+        Supprimer l'OTP de Redis - Version async
         """
         redis_key = f"otp:{phone_number}"
         
-        # Appeler la méthode async de manière synchrone
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            loop.run_until_complete(self.cache.delete(redis_key))
-            logger.info(f"🗑️ OTP supprimé de Redis pour {phone_number}")
-        finally:
-            loop.close()
+        # Utiliser directement la méthode async
+        await self.cache.delete(redis_key)
+        logger.info(f"🗑️ OTP supprimé de Redis pour {phone_number}")
     
     async def send_otp(self, phone_number: str) -> Dict[str, Any]:
         """
@@ -98,7 +81,7 @@ class AuthService:
             otp_code = generate_otp()
             
             # Stocker dans Redis
-            self._store_otp_sync(clean_phone, otp_code)
+            await self._store_otp(clean_phone, otp_code)
             
             # Message à envoyer
             message = f"Votre code AlloBara est: {otp_code}. Ce code expire dans 10 minutes."
@@ -146,7 +129,7 @@ class AuthService:
             logger.info(f"🔐 Vérification OTP: {phone_number} -> {clean_phone}, code: {otp_code}")
             
             # Récupérer l'OTP depuis Redis
-            stored_otp = self._get_otp_sync(clean_phone)
+            stored_otp = await self._get_otp(clean_phone)
             
             if not stored_otp:
                 logger.warning(f"❌ OTP non trouvé ou expiré pour {clean_phone}")
@@ -169,7 +152,7 @@ class AuthService:
                 }
             
             # Code valide, le supprimer du cache
-            self._clear_otp_sync(clean_phone)
+            await self._clear_otp(clean_phone)
             logger.info(f"✅ OTP vérifié avec succès pour {clean_phone}")
             
             return {
