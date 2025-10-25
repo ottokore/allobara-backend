@@ -129,6 +129,7 @@ class Subscription(Base):
     # RELATIONS
     # =====================================
     user = relationship("User", back_populates="subscription")
+    payments = relationship("Payment", back_populates="subscription", cascade="all, delete-orphan")  # 🔧 FIX: Relation ajoutée
     
     # =====================================
     # REPRÉSENTATION STRING
