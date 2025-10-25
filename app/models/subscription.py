@@ -386,5 +386,5 @@ class Subscription(Base):
             "progress_percentage": self.progress_percentage,
             "auto_renewal": self.auto_renewal,
             "payment_status": self.payment_status.value if self.payment_status else None,
-            "created_at": self.created_at.isoformat() if self.created_at else None
+            "created_at": self.created_at.isoformat() if self.created_at else None,
         }
