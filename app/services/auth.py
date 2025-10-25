@@ -17,12 +17,12 @@ from app.core.security import (
 from app.core.config import settings
 from app.models.user import User
 from app.services.sms import SMSService
+from app.services.cache import CacheService  # ⭐ AJOUTÉ POUR REDIS
 
 import logging
 logger = logging.getLogger(__name__)
 
-# 🔧 CACHE OTP GLOBAL AU NIVEAU DU MODULE (PERSISTE ENTRE LES REQUÊTES)
-_MODULE_OTP_CACHE: Dict[str, Dict] = {}
+# ✅ Cache Redis au lieu de cache mémoire local
 
 class AuthService:
     
@@ -32,61 +32,41 @@ class AuthService:
     
     def _store_otp(self, phone_number: str, otp_code: str) -> None:
         """
-        Stocker l'OTP temporairement (10 minutes pour la démo)
+        Stocker l'OTP dans Redis (10 minutes)
         """
-        global _MODULE_OTP_CACHE
+        expires_in = 600  # 10 minutes en secondes
+        redis_key = f"otp:{phone_number}"
         
-        expires_at = datetime.utcnow() + timedelta(minutes=10)
-        _MODULE_OTP_CACHE[phone_number] = {
-            "code": otp_code,
-            "expires_at": expires_at,
-            "attempts": 0,
-            "created_at": datetime.utcnow()
-        }
+        # Stocker dans Redis
+        CacheService.set(redis_key, otp_code, expire=expires_in)
         
-        logger.info(f"📱 OTP stocké pour {phone_number}: {otp_code} (expire à {expires_at})")
+        logger.info(f"📱 OTP stocké dans Redis pour {phone_number}: {otp_code} (expire dans 10min)")
     
-    def _get_otp(self, phone_number: str) -> Optional[Dict]:
+    def _get_otp(self, phone_number: str) -> Optional[str]:
         """
-        Récupérer l'OTP stocké avec logs améliorés
+        Récupérer l'OTP depuis Redis
         """
-        global _MODULE_OTP_CACHE
-        current_time = datetime.utcnow()
+        redis_key = f"otp:{phone_number}"
+        otp_code = CacheService.get(redis_key)
         
-        if phone_number in _MODULE_OTP_CACHE:
-            otp_data = _MODULE_OTP_CACHE[phone_number]
-            
-            logger.info(f"🔍 Vérification OTP pour {phone_number}:")
-            logger.info(f"   - Code stocké: {otp_data['code']}")
-            logger.info(f"   - Créé à : {otp_data['created_at']}")
-            logger.info(f"   - Expire à : {otp_data['expires_at']}")
-            logger.info(f"   - Actuel: {current_time}")
-            logger.info(f"   - Tentatives: {otp_data['attempts']}")
-            
-            # Vérifier si expiré
-            if current_time > otp_data["expires_at"]:
-                logger.warning(f"⚠️ OTP expiré pour {phone_number} (expiré depuis {current_time - otp_data['expires_at']})")
-                del _MODULE_OTP_CACHE[phone_number]
-                return None
-            
-            time_left = otp_data["expires_at"] - current_time
-            logger.info(f"✅ OTP valide, temps restant: {time_left}")
-            
-            return otp_data
+        if otp_code:
+            ttl = CacheService.ttl(redis_key)
+            logger.info(f"✅ OTP trouvé dans Redis pour {phone_number}: {otp_code}, TTL: {ttl}s")
+            return otp_code
         else:
-            logger.warning(f"❌ Aucun OTP trouvé pour {phone_number}")
-            logger.info(f"📋 OTPs actifs: {list(_MODULE_OTP_CACHE.keys())}")
+            logger.warning(f"❌ Aucun OTP trouvé dans Redis pour {phone_number}")
+            # Lister les OTP actifs pour debug
+            active_keys = CacheService.keys("otp:*")
+            logger.info(f"📋 OTPs actifs dans Redis: {active_keys}")
             return None
     
     def _clear_otp(self, phone_number: str) -> None:
         """
-        Supprimer l'OTP du cache
+        Supprimer l'OTP de Redis
         """
-        global _MODULE_OTP_CACHE
-        
-        if phone_number in _MODULE_OTP_CACHE:
-            del _MODULE_OTP_CACHE[phone_number]
-            logger.info(f"🗑️ OTP supprimé pour {phone_number}")
+        redis_key = f"otp:{phone_number}"
+        CacheService.delete(redis_key)
+        logger.info(f"🗑️ OTP supprimé de Redis pour {phone_number}")
     
     async def send_otp(self, phone_number: str) -> Dict[str, Any]:
         """
@@ -100,16 +80,8 @@ class AuthService:
             # Générer le code OTP
             otp_code = generate_otp()
             
-            # Stocker temporairement
+            # Stocker dans Redis
             self._store_otp(clean_phone, otp_code)
-            
-            # 📊 DEBUG LOGS AJOUTÉS
-            logger.info(f"📊 CACHE DEBUG après stockage:")
-            logger.info(f"   - Numéro stocké: {clean_phone}")
-            logger.info(f"   - Code stocké: {otp_code}")
-            logger.info(f"   - Cache actuel: {_MODULE_OTP_CACHE}")
-            logger.info(f"   - ID de l'instance AuthService: {id(self)}")
-            logger.info(f"   - ID du cache global: {id(_MODULE_OTP_CACHE)}")
             
             # Message à envoyer
             message = f"Votre code AlloBara est: {otp_code}. Ce code expire dans 10 minutes."
@@ -156,38 +128,18 @@ class AuthService:
             clean_phone = sanitize_phone_number(phone_number)
             logger.info(f"🔐 Vérification OTP: {phone_number} -> {clean_phone}, code: {otp_code}")
             
-            # 📊 DEBUG LOGS AJOUTÉS
-            logger.info(f"📊 CACHE DEBUG avant vérification:")
-            logger.info(f"   - Numéro recherché: {clean_phone}")
-            logger.info(f"   - Cache complet: {_MODULE_OTP_CACHE}")
-            logger.info(f"   - Clés disponibles: {list(_MODULE_OTP_CACHE.keys())}")
-            logger.info(f"   - ID de l'instance AuthService: {id(self)}")
-            logger.info(f"   - ID du cache global: {id(_MODULE_OTP_CACHE)}")
+            # Récupérer l'OTP depuis Redis
+            stored_otp = self._get_otp(clean_phone)
             
-            otp_data = self._get_otp(clean_phone)
-            
-            if not otp_data:
+            if not stored_otp:
                 logger.warning(f"❌ OTP non trouvé ou expiré pour {clean_phone}")
                 return {
                     "success": False,
                     "message": "Code OTP expiré ou inexistant"
                 }
             
-            # Incrémenter les tentatives
-            otp_data["attempts"] += 1
-            logger.info(f"📊 Tentative {otp_data['attempts']}/3 pour {clean_phone}")
-            
-            # Limite de 3 tentatives
-            if otp_data["attempts"] > 3:
-                logger.warning(f"🚫 Trop de tentatives pour {clean_phone}")
-                self._clear_otp(clean_phone)
-                return {
-                    "success": False,
-                    "message": "Trop de tentatives. Demandez un nouveau code."
-                }
-            
             # Vérifier le code (conversion en string pour sécurité)
-            stored_code = str(otp_data["code"]).strip()
+            stored_code = str(stored_otp).strip()
             input_code = str(otp_code).strip()
             
             logger.info(f"🔍 Comparaison: '{stored_code}' vs '{input_code}'")
@@ -196,7 +148,7 @@ class AuthService:
                 logger.warning(f"❌ Code incorrect pour {clean_phone}: reçu '{input_code}', attendu '{stored_code}'")
                 return {
                     "success": False,
-                    "message": f"Code OTP incorrect (tentative {otp_data['attempts']}/3)"
+                    "message": "Code OTP incorrect"
                 }
             
             # Code valide, le supprimer du cache
@@ -217,19 +169,22 @@ class AuthService:
     
     def debug_list_active_otps(self) -> Dict[str, Any]:
         """
-        Lister tous les OTP actifs (uniquement pour le debug)
+        Lister tous les OTP actifs dans Redis (uniquement pour le debug)
         """
-        global _MODULE_OTP_CACHE
         current_time = datetime.utcnow()
         active_otps = {}
         
-        for phone, data in _MODULE_OTP_CACHE.items():
-            time_left = data["expires_at"] - current_time
+        # Récupérer toutes les clés OTP depuis Redis
+        otp_keys = CacheService.keys("otp:*")
+        
+        for redis_key in otp_keys:
+            phone = redis_key.replace("otp:", "")
+            otp_code = CacheService.get(redis_key)
+            ttl = CacheService.ttl(redis_key)
+            
             active_otps[phone] = {
-                "code": data["code"],
-                "expires_at": data["expires_at"].isoformat(),
-                "time_left_seconds": int(time_left.total_seconds()),
-                "attempts": data["attempts"]
+                "code": otp_code,
+                "time_left_seconds": ttl
             }
         
         return {
