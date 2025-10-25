@@ -26,7 +26,7 @@ from app.schemas.payment import (
     PaymentHistoryResponse
 )
 from app.services.cinetpay_service import CinetPayService
-from app.services.subscription_service import SubscriptionService
+#from app.services.subscription_service import SubscriptionService
 from app.services.audit import AuditService
 
 
