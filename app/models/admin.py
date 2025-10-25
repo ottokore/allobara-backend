@@ -49,154 +49,54 @@ class AdminWallet(Base):
     """
     __tablename__ = "admin_wallet"
     
-    # =====================================
-    # IDENTIFIANT
-    # =====================================
     id = Column(Integer, primary_key=True, index=True)
     
-    # =====================================
-    # SOLDES
-    # =====================================
-    total_balance = Column(Float, default=0.0, nullable=False)        # Solde total
-    available_balance = Column(Float, default=0.0, nullable=False)    # Solde disponible
-    pending_balance = Column(Float, default=0.0, nullable=False)      # Solde en attente
-    withdrawn_balance = Column(Float, default=0.0, nullable=False)    # Total retiré
+    # Soldes
+    balance = Column(Integer, default=0, nullable=False)
+    total_received = Column(Integer, default=0)
+    total_withdrawn = Column(Integer, default=0)
+    pending_withdrawals = Column(Integer, default=0)
     
-    # =====================================
-    # STATISTIQUES REVENUS
-    # =====================================
-    today_revenue = Column(Float, default=0.0)           # Revenus aujourd'hui
-    week_revenue = Column(Float, default=0.0)            # Revenus cette semaine
-    month_revenue = Column(Float, default=0.0)           # Revenus ce mois
-    year_revenue = Column(Float, default=0.0)            # Revenus cette année
+    # Statistiques
+    total_transactions = Column(Integer, default=0)
+    last_transaction_at = Column(DateTime, nullable=True)
     
-    # Compteurs transactions
-    total_transactions = Column(Integer, default=0)       # Nombre total de transactions
-    today_transactions = Column(Integer, default=0)       # Transactions aujourd'hui
-    
-    # =====================================
-    # COMMISSION ET FEES
-    # =====================================
-    commission_rate = Column(Float, default=0.0)         # Taux de commission (futur)
-    processing_fee = Column(Float, default=0.0)          # Frais de traitement
-    
-    # =====================================
-    # MÉTADONNÉES
-    # =====================================
-    last_transaction_date = Column(DateTime, nullable=True)  # Dernière transaction
-    last_withdrawal_date = Column(DateTime, nullable=True)   # Dernier retrait
-    last_updated = Column(DateTime, default=func.now(), onupdate=func.now())
-    
-    # Informations du compte Wave principal
-    wave_account_number = Column(String(20), nullable=True)  # Numéro de compte Wave
-    wave_account_name = Column(String(100), nullable=True)   # Nom du compte
-    
-    # =====================================
-    # HORODATAGE
-    # =====================================
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    # =====================================
-    # REPRÉSENTATION STRING
-    # =====================================
-    def __repr__(self):
-        return f"<AdminWallet(total={self.total_balance} FCFA, available={self.available_balance} FCFA)>"
-    
-    def __str__(self):
-        return f"Wallet Admin - {self.formatted_total_balance} FCFA"
-    
-    # =====================================
-    # PROPRIÉTÉS CALCULÉES
-    # =====================================
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     @property
-    def formatted_total_balance(self) -> str:
-        """Solde total formaté"""
-        return f"{int(self.total_balance):,} FCFA".replace(",", " ")
+    def available_balance(self) -> int:
+        """Solde disponible (balance - pending_withdrawals)"""
+        return self.balance - self.pending_withdrawals
     
     @property
-    def formatted_available_balance(self) -> str:
+    def formatted_balance(self) -> str:
+        """Solde formaté en FCFA"""
+        return f"{self.balance:,} FCFA".replace(",", " ")
+    
+    @property
+    def formatted_available(self) -> str:
         """Solde disponible formaté"""
-        return f"{int(self.available_balance):,} FCFA".replace(",", " ")
+        return f"{self.available_balance:,} FCFA".replace(",", " ")
     
-    @property
-    def formatted_today_revenue(self) -> str:
-        """Revenus du jour formatés"""
-        return f"{int(self.today_revenue):,} FCFA".replace(",", " ")
-    
-    @property
-    def can_withdraw(self) -> bool:
-        """Vérifier si un retrait est possible"""
-        return self.available_balance > 0
-    
-    @property
-    def pending_withdrawal_ratio(self) -> float:
-        """Ratio de solde en attente"""
-        if self.total_balance == 0:
-            return 0.0
-        return self.pending_balance / self.total_balance
-    
-    # =====================================
-    # MÉTHODES UTILITAIRES
-    # =====================================
-    
-    def add_revenue(self, amount: float, transaction_type: TransactionType = TransactionType.SUBSCRIPTION):
-        """Ajouter des revenus au wallet"""
-        if amount <= 0:
-            return False
-        
-        self.total_balance += amount
-        self.available_balance += amount
-        self.today_revenue += amount
-        self.month_revenue += amount
-        self.year_revenue += amount
-        self.total_transactions += 1
-        self.today_transactions += 1
-        self.last_transaction_date = datetime.utcnow()
-        self.last_updated = datetime.utcnow()
-        
-        return True
-    
-    def reserve_for_withdrawal(self, amount: float) -> bool:
-        """Réserver un montant pour retrait"""
-        if amount > self.available_balance:
-            return False
-        
-        self.available_balance -= amount
-        self.pending_balance += amount
-        self.last_updated = datetime.utcnow()
-        
-        return True
-    
-    def complete_withdrawal(self, amount: float) -> bool:
-        """Finaliser un retrait"""
-        if amount > self.pending_balance:
-            return False
-        
-        self.pending_balance -= amount
-        self.withdrawn_balance += amount
-        self.last_withdrawal_date = datetime.utcnow()
-        self.last_updated = datetime.utcnow()
-        
-        return True
-    
-    def cancel_withdrawal(self, amount: float) -> bool:
-        """Annuler un retrait"""
-        if amount > self.pending_balance:
-            return False
-        
-        self.pending_balance -= amount
-        self.available_balance += amount
-        self.last_updated = datetime.utcnow()
-        
-        return True
-    
-    def reset_daily_stats(self):
-        """Remettre à zéro les stats journalières"""
-        self.today_revenue = 0.0
-        self.today_transactions = 0
-        self.last_updated = datetime.utcnow()
+    def to_dict(self) -> dict:
+        """Convertir en dictionnaire pour l'API"""
+        return {
+            "id": self.id,
+            "balance": self.balance,
+            "formatted_balance": self.formatted_balance,
+            "available_balance": self.available_balance,
+            "formatted_available": self.formatted_available,
+            "total_received": self.total_received,
+            "total_withdrawn": self.total_withdrawn,
+            "pending_withdrawals": self.pending_withdrawals,
+            "total_transactions": self.total_transactions,
+            "last_transaction_at": self.last_transaction_at.isoformat() if self.last_transaction_at else None,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat()
+        }
+
 
 # =========================================
 # DEMANDES DE RETRAIT
@@ -204,251 +104,214 @@ class AdminWallet(Base):
 
 class WithdrawalRequest(Base):
     """
-    Demandes de retrait d'argent par l'admin
+    Demandes de retrait des prestataires
     """
     __tablename__ = "withdrawal_requests"
     
-    # =====================================
-    # IDENTIFIANTS
-    # =====================================
     id = Column(Integer, primary_key=True, index=True)
-    reference = Column(String(20), unique=True, index=True)  # WDR2024001
+    user_id = Column(Integer, nullable=False, index=True)
     
-    # =====================================
-    # MONTANT ET DESTINATION
-    # =====================================
-    amount = Column(Float, nullable=False)                # Montant demandé
-    provider = Column(SQLEnum(PaymentProvider), nullable=False) # Wave, MTN, etc.
-    destination_number = Column(String(20), nullable=False)  # Numéro de destination
-    destination_name = Column(String(100), nullable=True)    # Nom du bénéficiaire
+    # Montant
+    amount = Column(Integer, nullable=False)
+    commission = Column(Integer, default=0)
+    net_amount = Column(Integer, nullable=False)
     
-    # =====================================
-    # STATUT ET TRAITEMENT
-    # =====================================
+    # Coordonnées bancaires
+    payment_method = Column(SQLEnum(PaymentProvider), nullable=False)
+    phone_number = Column(String(20), nullable=True)
+    bank_name = Column(String(100), nullable=True)
+    account_number = Column(String(50), nullable=True)
+    account_name = Column(String(100), nullable=True)
+    
+    # Statut
     status = Column(SQLEnum(WithdrawalStatus), default=WithdrawalStatus.PENDING)
     
-    # Détails du traitement
-    processed_at = Column(DateTime, nullable=True)        # Date de traitement
-    completed_at = Column(DateTime, nullable=True)        # Date de finalisation
-    failed_at = Column(DateTime, nullable=True)           # Date d'échec
+    # Informations de traitement
+    processed_by = Column(Integer, nullable=True)
+    processed_at = Column(DateTime, nullable=True)
+    transaction_id = Column(String(100), unique=True, nullable=True)
+    failure_reason = Column(Text, nullable=True)
     
-    # Réponse du provider
-    provider_reference = Column(String(100), nullable=True)  # Référence externe
-    provider_response = Column(Text, nullable=True)          # Réponse complète
-    error_message = Column(String(500), nullable=True)      # Message d'erreur
+    # Notes
+    notes = Column(Text, nullable=True)
+    admin_notes = Column(Text, nullable=True)
     
-    # =====================================
-    # FRAIS ET COMMISSION
-    # =====================================
-    fees = Column(Float, default=0.0)                    # Frais de retrait
-    net_amount = Column(Float, nullable=True)             # Montant net reçu
-    
-    # =====================================
-    # MÉTADONNÉES
-    # =====================================
-    notes = Column(Text, nullable=True)                   # Notes admin
-    ip_address = Column(String(45), nullable=True)       # IP de la demande
-    user_agent = Column(String(500), nullable=True)      # User agent
-    
-    # =====================================
-    # HORODATAGE
-    # =====================================
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    # =====================================
-    # REPRÉSENTATION STRING
-    # =====================================
-    def __repr__(self):
-        return f"<WithdrawalRequest(ref={self.reference}, amount={self.amount}, status={self.status.value})>"
-    
-    def __str__(self):
-        return f"Retrait {self.reference} - {self.formatted_amount}"
-    
-    # =====================================
-    # PROPRIÉTÉS CALCULÉES
-    # =====================================
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     @property
     def formatted_amount(self) -> str:
         """Montant formaté"""
-        return f"{int(self.amount):,} FCFA".replace(",", " ")
+        return f"{self.amount:,} FCFA".replace(",", " ")
+    
+    @property
+    def formatted_commission(self) -> str:
+        """Commission formatée"""
+        return f"{self.commission:,} FCFA".replace(",", " ")
     
     @property
     def formatted_net_amount(self) -> str:
         """Montant net formaté"""
-        if self.net_amount:
-            return f"{int(self.net_amount):,} FCFA".replace(",", " ")
-        return self.formatted_amount
+        return f"{self.net_amount:,} FCFA".replace(",", " ")
     
     @property
     def status_display(self) -> str:
-        """Statut d'affichage"""
-        status_names = {
+        """Affichage du statut"""
+        status_map = {
             WithdrawalStatus.PENDING: "En attente",
             WithdrawalStatus.PROCESSING: "En cours",
             WithdrawalStatus.COMPLETED: "Terminé",
-            WithdrawalStatus.FAILED: "Échec",
+            WithdrawalStatus.FAILED: "Échoué",
             WithdrawalStatus.CANCELLED: "Annulé"
         }
-        return status_names.get(self.status, self.status.value)
+        return status_map.get(self.status, str(self.status))
     
-    @property
-    def is_pending(self) -> bool:
-        """Vérifier si en attente"""
-        return self.status == WithdrawalStatus.PENDING
-    
-    @property
-    def is_completed(self) -> bool:
-        """Vérifier si terminé"""
-        return self.status == WithdrawalStatus.COMPLETED
-    
-    @property
-    def can_be_cancelled(self) -> bool:
-        """Vérifier si peut être annulé"""
-        return self.status in [WithdrawalStatus.PENDING, WithdrawalStatus.PROCESSING]
-    
-    @property
-    def processing_time_minutes(self) -> int:
-        """Temps de traitement en minutes"""
-        if self.completed_at and self.created_at:
-            delta = self.completed_at - self.created_at
-            return int(delta.total_seconds() / 60)
-        return 0
-    
-    # =====================================
-    # MÉTHODES UTILITAIRES
-    # =====================================
-    
-    def start_processing(self):
-        """Démarrer le traitement"""
-        self.status = WithdrawalStatus.PROCESSING
-        self.processed_at = datetime.utcnow()
-    
-    def complete(self, provider_reference: str = None, net_amount: float = None):
-        """Finaliser le retrait"""
-        self.status = WithdrawalStatus.COMPLETED
-        self.completed_at = datetime.utcnow()
-        if provider_reference:
-            self.provider_reference = provider_reference
-        if net_amount:
-            self.net_amount = net_amount
-    
-    def fail(self, error_message: str):
-        """Marquer comme échoué"""
-        self.status = WithdrawalStatus.FAILED
-        self.failed_at = datetime.utcnow()
-        self.error_message = error_message
-    
-    def cancel(self, reason: str = None):
-        """Annuler la demande"""
-        self.status = WithdrawalStatus.CANCELLED
-        if reason:
-            self.notes = f"Annulé: {reason}"
-    
-    @classmethod
-    def generate_reference(cls) -> str:
-        """Générer une référence unique"""
-        from datetime import datetime
-        now = datetime.utcnow()
-        # Format: WDR + année + mois + jour + compteur
-        base = f"WDR{now.strftime('%Y%m%d')}"
-        # Ici on devrait compter les retraits du jour
-        # Pour simplifier, on utilise l'heure/minute
-        return f"{base}{now.strftime('%H%M')}"
+    def to_dict(self) -> dict:
+        """Convertir en dictionnaire"""
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "amount": self.amount,
+            "formatted_amount": self.formatted_amount,
+            "commission": self.commission,
+            "formatted_commission": self.formatted_commission,
+            "net_amount": self.net_amount,
+            "formatted_net_amount": self.formatted_net_amount,
+            "payment_method": self.payment_method.value if self.payment_method else None,
+            "phone_number": self.phone_number,
+            "bank_name": self.bank_name,
+            "account_number": self.account_number,
+            "account_name": self.account_name,
+            "status": self.status.value if self.status else None,
+            "status_display": self.status_display,
+            "processed_by": self.processed_by,
+            "processed_at": self.processed_at.isoformat() if self.processed_at else None,
+            "transaction_id": self.transaction_id,
+            "failure_reason": self.failure_reason,
+            "notes": self.notes,
+            "admin_notes": self.admin_notes,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat()
+        }
+
 
 # =========================================
-# STATISTIQUES JOURNALIÈRES
+# HISTORIQUE WALLET
 # =========================================
 
-class AdminDailyStats(Base):
+class WalletTransaction(Base):
     """
-    Statistiques journalières AlloBara
-    Pour le dashboard admin et les rapports
+    Historique de toutes les transactions du wallet admin
     """
-    __tablename__ = "admin_daily_stats"
+    __tablename__ = "wallet_transactions"
     
-    # =====================================
-    # IDENTIFIANTS
-    # =====================================
     id = Column(Integer, primary_key=True, index=True)
-    date = Column(Date, unique=True, index=True, nullable=False)  # Date des stats
+    wallet_id = Column(Integer, nullable=False, index=True)
     
-    # =====================================
-    # INSCRIPTIONS
-    # =====================================
-    new_users = Column(Integer, default=0)               # Nouvelles inscriptions
-    new_users_verified = Column(Integer, default=0)      # Inscriptions vérifiées
-    trial_started = Column(Integer, default=0)           # Essais commencés
-    trial_converted = Column(Integer, default=0)         # Essais convertis
+    # Transaction
+    transaction_type = Column(SQLEnum(TransactionType), nullable=False)
+    amount = Column(Integer, nullable=False)
+    balance_before = Column(Integer, nullable=False)
+    balance_after = Column(Integer, nullable=False)
     
-    # =====================================
-    # ABONNEMENTS
-    # =====================================
-    new_subscriptions = Column(Integer, default=0)       # Nouveaux abonnements
-    subscription_renewals = Column(Integer, default=0)    # Renouvellements
-    subscription_cancellations = Column(Integer, default=0) # Annulations
-    subscription_expirations = Column(Integer, default=0)  # Expirations
+    # Références
+    reference_id = Column(Integer, nullable=True)
+    reference_type = Column(String(50), nullable=True)
+    user_id = Column(Integer, nullable=True, index=True)
     
-    # Répartition par plan
-    monthly_subscriptions = Column(Integer, default=0)
-    quarterly_subscriptions = Column(Integer, default=0)
-    biannual_subscriptions = Column(Integer, default=0)
-    annual_subscriptions = Column(Integer, default=0)
+    # Description
+    description = Column(Text, nullable=True)
+    metadata = Column(Text, nullable=True)
     
-    # =====================================
-    # REVENUS
-    # ================================================
-    total_revenue = Column(Float, default=0.0)           # Revenus total du jour
-    subscription_revenue = Column(Float, default=0.0)    # Revenus abonnements
+    # Timestamp
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
     
-    # Répartition des revenus par plan
-    monthly_revenue = Column(Float, default=0.0)
-    quarterly_revenue = Column(Float, default=0.0)
-    biannual_revenue = Column(Float, default=0.0)
-    annual_revenue = Column(Float, default=0.0)
+    @property
+    def formatted_amount(self) -> str:
+        """Montant formaté"""
+        return f"{self.amount:,} FCFA".replace(",", " ")
     
-    # =====================================
-    # ACTIVITÉ UTILISATEURS
-    # =====================================
-    active_users = Column(Integer, default=0)            # Utilisateurs actifs
-    profile_views = Column(Integer, default=0)           # Vues de profils
-    searches_performed = Column(Integer, default=0)      # Recherches effectuées
-    contacts_made = Column(Integer, default=0)           # Contacts établis
+    @property
+    def formatted_balance_before(self) -> str:
+        """Solde avant formaté"""
+        return f"{self.balance_before:,} FCFA".replace(",", " ")
     
-    # =====================================
-    # CONTENU
-    # =====================================
-    new_portfolio_items = Column(Integer, default=0)     # Nouveaux éléments portfolio
-    new_reviews = Column(Integer, default=0)             # Nouveaux avis
-    reviews_approved = Column(Integer, default=0)        # Avis approuvés
-    reviews_rejected = Column(Integer, default=0)        # Avis rejetés
+    @property
+    def formatted_balance_after(self) -> str:
+        """Solde après formaté"""
+        return f"{self.balance_after:,} FCFA".replace(",", " ")
     
-    # =====================================
-    # FINANCE
-    # =====================================
-    withdrawals_requested = Column(Integer, default=0)   # Demandes de retrait
-    withdrawals_completed = Column(Integer, default=0)   # Retraits terminés
-    withdrawal_amount = Column(Float, default=0.0)       # Montant retiré
+    @property
+    def transaction_type_display(self) -> str:
+        """Affichage du type"""
+        type_map = {
+            TransactionType.SUBSCRIPTION: "Abonnement",
+            TransactionType.WITHDRAWAL: "Retrait",
+            TransactionType.REFUND: "Remboursement",
+            TransactionType.COMMISSION: "Commission",
+            TransactionType.BONUS: "Bonus"
+        }
+        return type_map.get(self.transaction_type, str(self.transaction_type))
     
-    # =====================================
-    # HORODATAGE
-    # =====================================
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    def to_dict(self) -> dict:
+        """Convertir en dictionnaire"""
+        return {
+            "id": self.id,
+            "wallet_id": self.wallet_id,
+            "transaction_type": self.transaction_type.value if self.transaction_type else None,
+            "transaction_type_display": self.transaction_type_display,
+            "amount": self.amount,
+            "formatted_amount": self.formatted_amount,
+            "balance_before": self.balance_before,
+            "formatted_balance_before": self.formatted_balance_before,
+            "balance_after": self.balance_after,
+            "formatted_balance_after": self.formatted_balance_after,
+            "reference_id": self.reference_id,
+            "reference_type": self.reference_type,
+            "user_id": self.user_id,
+            "description": self.description,
+            "metadata": self.metadata,
+            "created_at": self.created_at.isoformat()
+        }
+
+
+# =========================================
+# STATISTIQUES DE REVENUS
+# =========================================
+
+class RevenueStats(Base):
+    """
+    Statistiques de revenus journaliers
+    Agrégation pour les graphiques et rapports
+    """
+    __tablename__ = "revenue_stats"
     
-    # =====================================
-    # REPRÉSENTATION STRING
-    # =====================================
-    def __repr__(self):
-        return f"<DailyStats(date={self.date}, users={self.new_users}, revenue={self.total_revenue})>"
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, nullable=False, unique=True, index=True)
     
-    def __str__(self):
-        return f"Stats du {self.date.strftime('%d/%m/%Y')}"
+    # Nouveaux abonnements
+    new_users = Column(Integer, default=0)
+    new_subscriptions = Column(Integer, default=0)
     
-    # =====================================
-    # PROPRIÉTÉS CALCULÉES
-    # =====================================
+    # Revenus par plan
+    monthly_revenue = Column(Integer, default=0)
+    quarterly_revenue = Column(Integer, default=0)
+    biannual_revenue = Column(Integer, default=0)
+    annual_revenue = Column(Integer, default=0)
+    
+    # Total
+    total_revenue = Column(Integer, default=0)
+    
+    # Renouvellements
+    renewals = Column(Integer, default=0)
+    
+    # Conversions période d'essai
+    trial_to_paid = Column(Integer, default=0)
+    
+    # Timestamp
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     @property
     def formatted_date(self) -> str:
@@ -457,31 +320,26 @@ class AdminDailyStats(Base):
     
     @property
     def formatted_revenue(self) -> str:
-        """Revenus formatés"""
-        return f"{int(self.total_revenue):,} FCFA".replace(",", " ")
-    
-    @property
-    def average_revenue_per_user(self) -> float:
-        """Revenus moyens par utilisateur"""
-        if self.new_users == 0:
-            return 0.0
-        return self.total_revenue / self.new_users
-    
-    @property
-    def trial_conversion_rate(self) -> float:
-        """Taux de conversion des essais"""
-        if self.trial_started == 0:
-            return 0.0
-        return self.trial_converted / self.trial_started
+        """Revenu total formaté"""
+        return f"{self.total_revenue:,} FCFA".replace(",", " ")
     
     @property
     def subscription_breakdown(self) -> dict:
         """Répartition des abonnements"""
+        total = self.new_subscriptions
+        if total == 0:
+            return {}
+        
+        monthly = (self.monthly_revenue / 2500) if self.monthly_revenue > 0 else 0
+        quarterly = (self.quarterly_revenue / 5500) if self.quarterly_revenue > 0 else 0
+        biannual = (self.biannual_revenue / 9500) if self.biannual_revenue > 0 else 0
+        annual = (self.annual_revenue / 16500) if self.annual_revenue > 0 else 0
+        
         return {
-            "monthly": self.monthly_subscriptions,
-            "quarterly": self.quarterly_subscriptions, 
-            "biannual": self.biannual_subscriptions,
-            "annual": self.annual_subscriptions
+            "monthly": int(monthly),
+            "quarterly": int(quarterly),
+            "biannual": int(biannual),
+            "annual": int(annual)
         }
     
     @property
@@ -490,52 +348,24 @@ class AdminDailyStats(Base):
         return {
             "monthly": self.monthly_revenue,
             "quarterly": self.quarterly_revenue,
-            "biannual": self.biannual_revenue, 
-            "annual": self.annual_revenue
+            "biannual": self.biannual_revenue,
+            "annual": self.annual_revenue,
+            "total": self.total_revenue
         }
     
-    # =====================================
-    # MÉTHODES UTILITAIRES
-    # =====================================
+    @property
+    def trial_conversion_rate(self) -> float:
+        """Taux de conversion période d'essai"""
+        if self.new_users == 0:
+            return 0.0
+        return round((self.trial_to_paid / self.new_users) * 100, 2)
     
-    @classmethod
-    def get_or_create_today(cls, db_session):
-        """Obtenir ou créer les stats d'aujourd'hui"""
-        today = date.today()
-        stats = db_session.query(cls).filter(cls.date == today).first()
-        
-        if not stats:
-            stats = cls(date=today)
-            db_session.add(stats)
-            db_session.commit()
-        
-        return stats
-    
-    def increment_new_users(self, count: int = 1):
-        """Incrémenter les nouvelles inscriptions"""
-        self.new_users += count
-    
-    def increment_revenue(self, amount: float, subscription_type: str = None):
-        """Incrémenter les revenus"""
-        self.total_revenue += amount
-        self.subscription_revenue += amount
-        
-        # Répartition par type d'abonnement
-        if subscription_type:
-            if subscription_type == "monthly":
-                self.monthly_revenue += amount
-                self.monthly_subscriptions += 1
-            elif subscription_type == "quarterly":
-                self.quarterly_revenue += amount
-                self.quarterly_subscriptions += 1
-            elif subscription_type == "biannual":
-                self.biannual_revenue += amount
-                self.biannual_subscriptions += 1
-            elif subscription_type == "annual":
-                self.annual_revenue += amount
-                self.annual_subscriptions += 1
-        
-        self.new_subscriptions += 1
+    @property
+    def average_revenue_per_user(self) -> int:
+        """Revenu moyen par utilisateur"""
+        if self.new_subscriptions == 0:
+            return 0
+        return round(self.total_revenue / self.new_subscriptions)
     
     def to_dict(self) -> dict:
         """Convertir en dictionnaire pour l'API"""
@@ -549,4 +379,70 @@ class AdminDailyStats(Base):
             "revenue_breakdown": self.revenue_breakdown,
             "trial_conversion_rate": self.trial_conversion_rate,
             "average_revenue_per_user": self.average_revenue_per_user
+        }
+
+
+# =========================================
+# STATISTIQUES JOURNALIÈRES (NOUVEAU)
+# =========================================
+
+class DailyStats(Base):
+    """
+    Statistiques journalières agrégées
+    Utilisé pour les graphiques et analytics
+    """
+    __tablename__ = "daily_stats"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, nullable=False, unique=True, index=True)
+    
+    # Métriques utilisateurs
+    total_users = Column(Integer, default=0)
+    new_users = Column(Integer, default=0)
+    total_providers = Column(Integer, default=0)
+    new_providers = Column(Integer, default=0)
+    active_users = Column(Integer, default=0)
+    
+    # Métriques financières
+    total_revenue = Column(Integer, default=0)
+    new_subscriptions = Column(Integer, default=0)
+    active_subscriptions = Column(Integer, default=0)
+    trial_conversions = Column(Integer, default=0)
+    
+    # Métriques d'engagement
+    total_searches = Column(Integer, default=0)
+    total_quotes = Column(Integer, default=0)
+    total_reviews = Column(Integer, default=0)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    @property
+    def formatted_date(self) -> str:
+        """Date formatée"""
+        return self.date.strftime("%d/%m/%Y")
+    
+    @property
+    def formatted_revenue(self) -> str:
+        """Revenu formaté"""
+        return f"{self.total_revenue:,} FCFA".replace(",", " ")
+    
+    def to_dict(self) -> dict:
+        """Convertir en dictionnaire"""
+        return {
+            "date": self.formatted_date,
+            "total_users": self.total_users,
+            "new_users": self.new_users,
+            "total_providers": self.total_providers,
+            "new_providers": self.new_providers,
+            "active_users": self.active_users,
+            "total_revenue": self.total_revenue,
+            "formatted_revenue": self.formatted_revenue,
+            "new_subscriptions": self.new_subscriptions,
+            "active_subscriptions": self.active_subscriptions,
+            "trial_conversions": self.trial_conversions,
+            "total_searches": self.total_searches,
+            "total_quotes": self.total_quotes,
+            "total_reviews": self.total_reviews
         }
