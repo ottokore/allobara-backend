@@ -1,5 +1,5 @@
 """
-Service d'authentification AlloBara - VERSION CORRIGÉE
+Service d'authentification AlloBara - VERSION REDIS ASYNC
 Gestion complète de l'auth: OTP, PIN, JWT
 """
 
@@ -29,44 +29,61 @@ class AuthService:
     def __init__(self, db: Session):
         self.db = db
         self.sms_service = SMSService()
+        self.cache = CacheService()  # ⭐ Instance du cache
     
-    def _store_otp(self, phone_number: str, otp_code: str) -> None:
+    def _store_otp_sync(self, phone_number: str, otp_code: str) -> None:
         """
-        Stocker l'OTP dans Redis (10 minutes)
+        Stocker l'OTP dans Redis (10 minutes) - Version synchrone
         """
         expires_in = 600  # 10 minutes en secondes
         redis_key = f"otp:{phone_number}"
         
-        # Stocker dans Redis
-        CacheService.set(redis_key, otp_code, expire=expires_in)
-        
-        logger.info(f"📱 OTP stocké dans Redis pour {phone_number}: {otp_code} (expire dans 10min)")
+        # Appeler la méthode async de manière synchrone
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(
+                self.cache.set(redis_key, otp_code, expire_seconds=expires_in)
+            )
+            logger.info(f"📱 OTP stocké dans Redis pour {phone_number}: {otp_code} (expire dans 10min)")
+        finally:
+            loop.close()
     
-    def _get_otp(self, phone_number: str) -> Optional[str]:
+    def _get_otp_sync(self, phone_number: str) -> Optional[str]:
         """
-        Récupérer l'OTP depuis Redis
+        Récupérer l'OTP depuis Redis - Version synchrone
         """
         redis_key = f"otp:{phone_number}"
-        otp_code = CacheService.get(redis_key)
         
-        if otp_code:
-            ttl = CacheService.ttl(redis_key)
-            logger.info(f"✅ OTP trouvé dans Redis pour {phone_number}: {otp_code}, TTL: {ttl}s")
-            return otp_code
-        else:
-            logger.warning(f"❌ Aucun OTP trouvé dans Redis pour {phone_number}")
-            # Lister les OTP actifs pour debug
-            active_keys = CacheService.keys("otp:*")
-            logger.info(f"📋 OTPs actifs dans Redis: {active_keys}")
-            return None
+        # Appeler la méthode async de manière synchrone
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            otp_code = loop.run_until_complete(self.cache.get(redis_key))
+            
+            if otp_code:
+                logger.info(f"✅ OTP trouvé dans Redis pour {phone_number}: {otp_code}")
+                return otp_code
+            else:
+                logger.warning(f"❌ Aucun OTP trouvé dans Redis pour {phone_number}")
+                return None
+        finally:
+            loop.close()
     
-    def _clear_otp(self, phone_number: str) -> None:
+    def _clear_otp_sync(self, phone_number: str) -> None:
         """
-        Supprimer l'OTP de Redis
+        Supprimer l'OTP de Redis - Version synchrone
         """
         redis_key = f"otp:{phone_number}"
-        CacheService.delete(redis_key)
-        logger.info(f"🗑️ OTP supprimé de Redis pour {phone_number}")
+        
+        # Appeler la méthode async de manière synchrone
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(self.cache.delete(redis_key))
+            logger.info(f"🗑️ OTP supprimé de Redis pour {phone_number}")
+        finally:
+            loop.close()
     
     async def send_otp(self, phone_number: str) -> Dict[str, Any]:
         """
@@ -81,7 +98,7 @@ class AuthService:
             otp_code = generate_otp()
             
             # Stocker dans Redis
-            self._store_otp(clean_phone, otp_code)
+            self._store_otp_sync(clean_phone, otp_code)
             
             # Message à envoyer
             message = f"Votre code AlloBara est: {otp_code}. Ce code expire dans 10 minutes."
@@ -122,14 +139,14 @@ class AuthService:
     
     async def verify_otp(self, phone_number: str, otp_code: str) -> Dict[str, Any]:
         """
-        Vérifier le code OTP avec logs détaillés
+        Vérifier le code OTP
         """
         try:
             clean_phone = sanitize_phone_number(phone_number)
             logger.info(f"🔐 Vérification OTP: {phone_number} -> {clean_phone}, code: {otp_code}")
             
             # Récupérer l'OTP depuis Redis
-            stored_otp = self._get_otp(clean_phone)
+            stored_otp = self._get_otp_sync(clean_phone)
             
             if not stored_otp:
                 logger.warning(f"❌ OTP non trouvé ou expiré pour {clean_phone}")
@@ -152,7 +169,7 @@ class AuthService:
                 }
             
             # Code valide, le supprimer du cache
-            self._clear_otp(clean_phone)
+            self._clear_otp_sync(clean_phone)
             logger.info(f"✅ OTP vérifié avec succès pour {clean_phone}")
             
             return {
@@ -170,21 +187,27 @@ class AuthService:
     def debug_list_active_otps(self) -> Dict[str, Any]:
         """
         Lister tous les OTP actifs dans Redis (uniquement pour le debug)
+        Note: Cette méthode ne peut pas lister facilement sans la méthode keys()
         """
+        return {
+            "message": "Liste des OTP non disponible (méthode keys() non implémentée dans CacheService)",
+            "count": 0
+        }
+    def debug_list_active_otps(self) -> Dict[str, Any]:
+        """
+        Lister tous les OTP actifs (uniquement pour le debug)
+        """
+        global _MODULE_OTP_CACHE
         current_time = datetime.utcnow()
         active_otps = {}
         
-        # Récupérer toutes les clés OTP depuis Redis
-        otp_keys = CacheService.keys("otp:*")
-        
-        for redis_key in otp_keys:
-            phone = redis_key.replace("otp:", "")
-            otp_code = CacheService.get(redis_key)
-            ttl = CacheService.ttl(redis_key)
-            
+        for phone, data in _MODULE_OTP_CACHE.items():
+            time_left = data["expires_at"] - current_time
             active_otps[phone] = {
-                "code": otp_code,
-                "time_left_seconds": ttl
+                "code": data["code"],
+                "expires_at": data["expires_at"].isoformat(),
+                "time_left_seconds": int(time_left.total_seconds()),
+                "attempts": data["attempts"]
             }
         
         return {
